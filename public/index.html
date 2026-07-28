@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kold Kalc — Freeze Protection ROI Analyzer | Kold Katcher Inc.</title>
+<link rel="icon" href="kk-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Cabin:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <img class="logo" src="kk-logo.png" alt="Kold Katcher Inc.">
+    <div class="titles">
+      <h1>Kold <span class="accent">Kalc</span></h1>
+      <p class="sub">Freeze Protection ROI Analyzer — Electric Heat Trace vs. Kold Katcher Glycol Heat Trace</p>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-page="calc" class="active">Calculator</button>
+      <button data-page="ai">✨ KK AI</button>
+      <button data-page="quotes">Saved ROIs</button>
+      <button data-page="tools">Other Tools</button>
+      <button data-page="units">Unit Catalog</button>
+      <button data-page="settings">Defaults</button>
+      <button data-page="math">🧮 Math</button>
+    </nav>
+  </div>
+</header>
+<main id="view"></main>
+<div class="toast" id="toast"></div>
+<div id="print-root"></div>
+<script src="app.js"></script>
+</body>
+</html>

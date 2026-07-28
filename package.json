@@ -1,0 +1,12 @@
+{
+  "name": "kold-kalc",
+  "version": "1.0.0",
+  "description": "Kold Kalc — Kold Katcher freeze-protection ROI analyzer",
+  "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
