@@ -1033,14 +1033,14 @@ function defaultVent() {
   return {
     pumps: 4, vent_scfd: 250, ch4_pct: 90,
     gas_conserved: true, gas_price: F(S.settings.gas_price) || 2.5,
-    carbon_credit: true, carbon_price: F(S.settings.carbon_price_t) || 95, gwp: F(S.settings.ch4_gwp) || 25,
+    carbon_credit: true, carbon_price: F(S.settings.carbon_price_t) || 110, gwp: F(S.settings.ch4_gwp) || 28,
     old_maint: 500, skid_cost: 18000, skid_install: 1500, skid_maint: 300,
     days: 365, years: 10
   };
 }
 function computeVent(v) {
   const scfYr = v.pumps * v.vent_scfd * v.days;
-  const gjYr = scfYr * GJ_PER_SCF;
+  const gjYr = scfYr * ngGjScf();
   const gasValue = v.gas_conserved ? gjYr * v.gas_price : 0;
   const ch4T = scfYr * (v.ch4_pct / 100) * SCF_KG_CH4 / 1000;
   const co2eT = ch4T * v.gwp;
