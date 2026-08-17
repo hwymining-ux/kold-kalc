@@ -186,6 +186,25 @@ SPEC NOTES (from KK spec sheets): all KX heat-trace units use flush-mount cataly
     .run('KK 2026 Official Price Sheet (CDN + USD)', 'text/plain', '', PRICE_TEXT, 'Official Kold Katcher 2026 pricing + spec summary — loaded from company price sheets');
 }
 
+// Seed a showcase ROI (typical KK win: remote wellsite, no grid power, unit on site fuel gas)
+const qCount = db.prepare('SELECT COUNT(*) AS n FROM quotes').get().n;
+if (qCount === 0) {
+  const s10 = db.prepare("SELECT id FROM units WHERE code = 'S10'").get();
+  const examplePayload = {
+    customer: 'Example — Remote Single-Well Gas Site', site: 'Peace Region, AB (no grid power on lease)', prepared_by: 'Kold Katcher Inc.',
+    len_ft: 300, watts_per_ft: 5, trace_cost_ft: 12, voltage: 240, auto_kits: true, startup_f: -40, breaker_a: 20,
+    pk_qty: 2, pk_price: 350, ek_qty: 2, ek_price: 95, cable_ft: 100, cable_cost_ft: 6,
+    elec_install: 2500, grid_ext: 45000, elec_maint: 0, power_rate: 0.20, demand_charge: 0,
+    season_months: 7, duty_cycle_pct: 60, analysis_years: 10,
+    unit_id: s10 ? s10.id : null, kk_kit_cost: 16532.15, kk_install: 1500, kk_maint: 250,
+    tube_cost_ft: 3.5, tube_install: 1500, fuel_hookup: 800,
+    fuel_type: 'ng', ng_usage: 10, ng_usage_unit: 'scf', gas_price: 2.50, gas_price_unit: 'GJ', site_gas: true,
+    prop_usage: 0.41, prop_usage_unit: 'L', prop_price: 0.65, prop_price_unit: 'L'
+  };
+  db.prepare('INSERT INTO quotes (quote_number, customer, site, prepared_by, payload) VALUES (?, ?, ?, ?, ?)')
+    .run('ROI-2026-001', examplePayload.customer, examplePayload.site, examplePayload.prepared_by, JSON.stringify(examplePayload));
+}
+
 // ---------- helpers ----------
 function json(res, code, obj) {
   const body = JSON.stringify(obj);

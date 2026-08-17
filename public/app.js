@@ -226,7 +226,7 @@ function renderCalc() {
         ${fld('Cable Cost ($/ft)', 'cable_cost_ft', c.cable_cost_ft)}
       </div>
       <div class="frow3">
-        ${fld('Electrical Install ($)', 'elec_install', c.elec_install, {hint: 'Panel, breaker, labour'})}
+        ${fld('Electrical Install ($)', 'elec_install', c.elec_install, {hint: 'Panel, GFEP breakers (code-required for heat trace), t-stat/controller, labour'})}
         ${fld('Grid / Line Extension ($)', 'grid_ext', c.grid_ext, {hint: 'Cost to bring power to site — set 0 if power exists'})}
         ${fld('Maintenance ($/yr)', 'elec_maint', c.elec_maint)}
       </div>
@@ -1153,7 +1153,7 @@ function defaultSolar() {
       { name: 'LED area lighting', watts: 40, hrs: 6, qty: 2 },
       { name: 'Gas detection', watts: 10, hrs: 24, qty: 1 }
     ],
-    sys_loss_pct: 15, sun_hrs: 1.8, derate_pct: 70, autonomy_days: 3,
+    sys_loss_pct: 15, sun_hrs: 1.8, derate_pct: 70, autonomy_days: 5,
     batt_dod_pct: 50, panel_w: 450
   };
 }
@@ -1193,7 +1193,7 @@ function renderSolarTool() {
       ${fld('Winter Peak Sun (hrs/day)', 'sp_sun', s.sun_hrs, {step: 0.1, hint: 'Alberta December ≈ 1.5–2.2'})}
       ${fld('System Losses (%)', 'sp_loss', s.sys_loss_pct, {step: 1, hint: 'Wiring, controller, inverter'})}
       ${fld('Panel Derate (%)', 'sp_derate', s.derate_pct, {step: 1, hint: 'Snow, soiling, cold-cloud — winter-safe 70%'})}
-      ${fld('Days of Autonomy', 'sp_auto', s.autonomy_days, {step: 0.5, hint: 'Battery-only days (storms)'})}
+      ${fld('Days of Autonomy', 'sp_auto', s.autonomy_days, {step: 0.5, hint: 'Battery-only days — northern AB practice: 5-7'})}
       ${fld('Battery Depth of Discharge (%)', 'sp_dod', s.batt_dod_pct, {step: 5, hint: 'AGM 50% · Lithium 80%'})}
       ${fld('Panel Size (W)', 'sp_panel', s.panel_w, {step: 5})}
     </div>
@@ -1845,7 +1845,7 @@ function mathContentHTML(c, r) {
     <h2>1 · Operating Hours (both systems)</h2>
     ${mf('Annual operating hours', 'hours = season months × 730.5 × (duty cycle ÷ 100)',
       `${num(c.season_months)} × 730.5 × ${num(c.duty_cycle_pct, 0)}% = <b>${hoursStr} hrs/yr</b>`)}
-    <div class="mf-note">730.5 = average hours in a month (8,766 ÷ 12). Duty cycle applies to both the electric trace and the KK burner, so the comparison stays fair.</div>
+    <div class="mf-note">730.5 = average hours in a month (8,766 ÷ 12). Duty cycle applies to both the electric trace and the KK burner, so the comparison stays fair. For self-regulating cable (whose output varies with pipe temperature by design) and for the modulating KK burner alike, duty% × maximum rating is the standard seasonal-average energy model.</div>
   </div>
 
   <div class="card elec">
@@ -1854,7 +1854,7 @@ function mathContentHTML(c, r) {
       `${num(c.len_ft)} × ${num(c.watts_per_ft)} ÷ 1000 = <b>${num(r.kw, 2)} kW</b>`)}
     ${mf('Circuits (→ power &amp; end kits)', 'circuits = ⌈ length ÷ max circuit length ⌉',
       `⌈ ${num(c.len_ft)} ÷ ${num(mx, 0)} ft ⌉ = <b>${circuits} circuit${circuits === 1 ? '' : 's'}</b> → ${circuits} power kit${circuits === 1 ? '' : 's'} + ${circuits} end kit${circuits === 1 ? '' : 's'}`)}
-    <div class="mf-note">Max circuit length (${num(mx, 0)} ft) is read from the published Raychem BTV table below: ${wpf}BTV, ${num(c.startup_f, 0)}°F cold start, ${num(c.voltage, 0)} V, ${num(c.breaker_a, 0)} A breaker.</div>
+    <div class="mf-note">Max circuit length (${num(mx, 0)} ft) is read from the published Raychem BTV table below: ${wpf}BTV, ${num(c.startup_f, 0)}°F cold start, ${num(c.voltage, 0)} V, ${num(c.breaker_a, 0)} A breaker. Entered W/ft snaps to the nearest standard cable (3/5/8/10 BTV); other manufacturers' tables differ slightly — swap in their values if the customer specifies a brand.</div>
     ${mf('Capital cost', 'capex = trace + kits + cable + install + line extension',
       `${money(r.traceCost)} + ${money(r.kitsCost)} + ${money(r.cableCost)} + ${money(c.elec_install)} + ${money(c.grid_ext)} = <b>${money(r.capexE)}</b>`)}
     ${mf('Annual energy', 'kWh/yr = kW × hours &nbsp;·&nbsp; cost = kWh/yr × $/kWh',
@@ -1895,6 +1895,7 @@ function mathContentHTML(c, r) {
     ${mf('Electric (grid)', 'tonnes CO₂e/yr = kWh/yr × grid factor ÷ 1000',
       `${num(r.kwhYr, 0)} × ${num(gridF, 2)} ÷ 1000 = <b>${num(r.co2E, 1)} t/yr</b>`)}
     ${mf('Kold Katcher (combustion)', c.fuel_type === 'ng' ? `tonnes/yr = scf/yr × ${ngCo2KgScf()} ÷ 1000` : `tonnes/yr = L/yr × ${propaneCo2KgL()} ÷ 1000`, co2K)}
+    <div class="mf-note">Combustion CO₂ only — CH₄/N₂O by-products add roughly 1–2% CO₂e and are excluded on both sides for simplicity.</div>
   </div>
 
   <div class="card neutral">
