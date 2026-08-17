@@ -20,19 +20,22 @@ Database auto-creates at `data/kkroi.db` on first run.
 - Electric side: trace length (ft) × watts/ft → kW load; $/ft trace cost; power kits,
   end kits, and cable-to-kit pricing; electrical install; grid/line-extension cost;
   $/kWh energy + optional demand charge.
-- Kold Katcher side: pick Unit A/B/C from the catalog (auto-fills kit cost, install,
-  maintenance, and fuel usage); natural gas ($/GJ or $/Mcf, scf/hr or m³/hr) or
-  propane ($/L or $/US gal); **"site fuel gas" checkbox** for wells that run the unit
-  on produced gas at zero fuel cost.
+- Kold Katcher side: pick a real unit from the catalog — Elite S5/S10/S20/S40KX
+  (complete solar) or T5/T10/T20/T40KX (customer power) — which auto-fills official
+  CDN list pricing and the manufacturer burn rate (BTU÷1,000 scf/hr @ max output);
+  natural gas ($/GJ or $/Mcf, scf/hr or m³/hr) or propane ($/L or $/US gal);
+  **"site fuel gas" checkbox** for wells that run the unit on produced gas at zero
+  fuel cost (with an opportunity-cost caveat if that gas is sellable).
 - Shared assumptions: freeze-season months, duty cycle, analysis period.
 - Outputs: capex/opex comparison table, annual savings, payback, N-year TCO and ROI,
   cumulative-cost chart with breakeven marker + hover tooltip, CO₂e comparison.
 
-**Saved Quotes** — save/reopen/duplicate/delete; auto-numbered `KK-YYYY-NNN`.
+**Saved ROIs** — save/reopen/duplicate/delete; auto-numbered `ROI-YYYY-NNN`.
 
-**Unit Catalog** — admin CRUD for the A/B/C units. **Seeded numbers are placeholders**
-(coverage ranges from the public Elite-series specs; pricing/fuel usage are guesses) —
-Kold Katcher enters their real pricing here and it drives the calculator.
+**Unit Catalog** — admin CRUD over the real 2026 KK lineup (8 units, official CDN
+list pricing + manufacturer burn rates from KK's spec sheets; USD pricing noted in
+each description). Install/maintenance are editable estimates; propane L/hr is
+derived from the BTU rating.
 
 **Defaults** — default utility rates, fuel prices, grid CO₂ factor, quote-footer contact,
 and **KK AI keys** (free Google Gemini key from aistudio.google.com/apikey, or a Claude
@@ -79,10 +82,10 @@ branded footer. Browser print-to-PDF.
 
 ## Key conversion factors (in `public/app.js`)
 
-- 1 scf natural gas ≈ 1,000 BTU ≈ 0.001055 GJ; 1 m³ = 35.3147 scf
+- 1 scf natural gas = 1,020 BTU = 0.001076 GJ (Alberta GHG methodology default; editable); 1 m³ = 35.3147 scf
 - 1 US gal propane = 3.78541 L
 - Emissions: NG 0.0551 kg CO₂/scf, propane 1.51 kg CO₂/L, grid factor configurable
-  (Alberta ≈ 0.43 kg/kWh)
+  (Alberta ≈ 0.335 kg/kWh, 2024 published)
 
 ## Stack notes
 

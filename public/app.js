@@ -721,7 +721,7 @@ function unitForm(u) {
   <div class="card kk">
     <h2>${isNew ? 'Add Unit' : 'Edit — ' + esc(u.name)}</h2>
     <div class="frow3">
-      ${fld('Code (A / B / C…)', 'u-code', u.code, {type: 'text'})}
+      ${fld('Code (S10 / T20 …)', 'u-code', u.code, {type: 'text'})}
       ${fld('Name', 'u-name', u.name, {type: 'text'})}
       ${fld('Coverage (e.g. 175 – 350 ft)', 'u-cov', u.coverage_ft, {type: 'text'})}
     </div>
@@ -778,7 +778,7 @@ function renderSettings() {
       ${fld('KK Tubing Install ($)', 'sd-tubei', st.def_tube_install)}
       ${fld('KK Fuel Gas Hookup ($)', 'sd-hookup', st.def_fuel_hookup)}
     </div>
-    <p class="hint">Burn rates per unit size (scf/hr and L/hr for each burner) live in the <b>Unit Catalog</b> tab — picking Unit A/B/C in the calculator pulls them in automatically.</p>
+    <p class="hint">Burn rates per unit size (scf/hr and L/hr for each burner) live in the <b>Unit Catalog</b> tab — picking a unit (S5KX–T40KX) in the calculator pulls them in automatically.</p>
   </div>
   <div class="card neutral">
     <h2>Default Rates &amp; Assumptions</h2>
@@ -1952,7 +1952,7 @@ function showAssumeForm() {
     <h2>Edit Assumptions</h2>
     <p class="hint" style="margin-top:0">These factors feed every formula. Change one and the whole ROI recalculates everywhere — calculator, PDF, and this page. Unit conversions (scf/m³, L/gal, hrs/month) are fixed definitions and can't be edited.</p>
     <div class="grid2">
-      ${fld('Natural gas energy (GJ/scf)', 'as-nggj', st.ng_energy_gj_scf || GJ_PER_SCF, {step: 0.000001, hint: '0.001055 ≈ 1,000 BTU/scf; raise for richer gas'})}
+      ${fld('Natural gas energy (GJ/scf)', 'as-nggj', st.ng_energy_gj_scf || GJ_PER_SCF, {step: 0.000001, hint: '0.001076 = 1,020 BTU/scf (AB GHG default); raise for richer gas'})}
       ${fld('Natural gas CO₂ (kg/scf)', 'as-ngco2', st.ng_co2_kg_scf || KG_CO2_PER_SCF_NG, {step: 0.0001})}
       ${fld('Propane CO₂ (kg/L)', 'as-propco2', st.propane_co2_kg_l || KG_CO2_PER_L_PROPANE, {step: 0.01})}
       ${fld('Grid CO₂ (kg/kWh)', 'as-grid', st.grid_co2_kg_kwh || 0.335, {step: 0.01, hint: 'Alberta grid intensity (0.335 = 2024 published)'})}
