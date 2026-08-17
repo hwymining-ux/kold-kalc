@@ -48,7 +48,7 @@ function defaultCalc() {
     pk_qty: 2, pk_price: F(st.def_pk_price) || 350, ek_qty: 2, ek_price: F(st.def_ek_price) || 150,
     cable_ft: 100, cable_cost_ft: F(st.def_cable_cost_ft) || 6,
     elec_install: 2500, grid_ext: 0, elec_maint: 0,
-    power_rate: F(st.power_rate_kwh) || 0.12,
+    power_rate: F(st.power_rate_kwh) || 0.20,
     demand_charge: F(st.demand_charge_kw_mo) || 0,
     // shared operating assumptions
     season_months: F(st.season_months) || 7,
@@ -107,7 +107,7 @@ function circuitCount(c) {
 function ngGjScf() { return F(S.settings.ng_energy_gj_scf) || GJ_PER_SCF; }
 function ngCo2KgScf() { return F(S.settings.ng_co2_kg_scf) || KG_CO2_PER_SCF_NG; }
 function propaneCo2KgL() { return F(S.settings.propane_co2_kg_l) || KG_CO2_PER_L_PROPANE; }
-function gridCo2KgKwh() { return F(S.settings.grid_co2_kg_kwh) || 0.43; }
+function gridCo2KgKwh() { return F(S.settings.grid_co2_kg_kwh) || 0.335; }
 
 function compute(c) {
   const hours = c.season_months * 730.5 * (c.duty_cycle_pct / 100);
@@ -231,8 +231,8 @@ function renderCalc() {
         ${fld('Maintenance ($/yr)', 'elec_maint', c.elec_maint)}
       </div>
       <div class="frow">
-        ${fld('Power Cost ($/kWh)', 'power_rate', c.power_rate, {step: 0.01})}
-        ${fld('Demand Charge ($/kW/mo)', 'demand_charge', c.demand_charge, {step: 0.01, hint: 'Optional — 0 if none'})}
+        ${fld('All-In Power Cost ($/kWh)', 'power_rate', c.power_rate, {step: 0.01, hint: 'Total bill ÷ kWh — AB energy ~12¢ + delivery/riders ~5-8¢'})}
+        ${fld('Demand Charge ($/kW/mo)', 'demand_charge', c.demand_charge, {step: 0.01, hint: 'Only if on a demand tariff — keep $/kWh volumetric-only then'})}
       </div>
     </div>
 
@@ -275,6 +275,7 @@ function renderCalc() {
         </div>
         <label class="checkline"><input type="checkbox" id="site_gas" ${c.site_gas ? 'checked' : ''}>
           Runs on site fuel gas (produced gas — no purchase cost)</label>
+        <div class="hint" style="margin:-2px 0 8px 24px">If that gas is conserved and could be sold, it isn't free — uncheck and price it at market instead.</div>
       </div>
       <div id="fuel-propane" style="display:${c.fuel_type === 'propane' ? '' : 'none'}">
         <div class="frow">
@@ -406,7 +407,7 @@ function refreshResults() {
     <div class="tile hero"><div class="t-label">Electric Load Displaced</div><div class="t-value">${num(r.kw, 2)} kW</div><div class="t-sub">${num(r.kwhYr, 0)} kWh / year</div></div>
     <div class="tile"><div class="t-label">Annual Operating Savings</div><div class="t-value ${r.savings >= 0 ? 'good' : 'bad'}">${money(r.savings)}</div><div class="t-sub">Electric ${money(r.opexE)} vs KK ${money(r.opexK)}</div></div>
     <div class="tile"><div class="t-label">Payback</div><div class="t-value ${pb != null && (pb <= r.years) ? 'good' : ''}">${pbText}</div><div class="t-sub">${pbSub}</div></div>
-    <div class="tile"><div class="t-label">${r.years}-Year Savings with KK</div><div class="t-value ${r.tcoSavings >= 0 ? 'good' : 'bad'}">${money(r.tcoSavings)}</div><div class="t-sub">ROI ${num(r.roiPct, 0)}% on KK investment</div></div>
+    <div class="tile"><div class="t-label">${r.years}-Year Savings with KK</div><div class="t-value ${r.tcoSavings >= 0 ? 'good' : 'bad'}">${money(r.tcoSavings)}</div><div class="t-sub">Undiscounted · ROI ${num(r.roiPct, 0)}% on KK investment</div></div>
   </div>
 
   <div class="grid2">
@@ -450,7 +451,7 @@ function refreshResults() {
   <div class="card neutral">
     <h2>Environmental &amp; Site Notes</h2>
     <div class="grid3">
-      <div><b>Electric emissions:</b> ${num(r.co2E, 1)} t CO₂e/yr<div class="hint">Grid @ ${num(F(S.settings.grid_co2_kg_kwh) || 0.43, 2)} kg/kWh</div></div>
+      <div><b>Electric emissions:</b> ${num(r.co2E, 1)} t CO₂e/yr<div class="hint">Grid @ ${num(gridCo2KgKwh(), 2)} kg/kWh</div></div>
       <div><b>Kold Katcher emissions:</b> ${num(r.co2K, 1)} t CO₂e/yr<div class="hint">${c.fuel_type === 'ng' ? 'Natural gas combustion' : 'Propane combustion'}</div></div>
       <div><b>Difference:</b> ${num(Math.abs(r.co2E - r.co2K), 1)} t CO₂e/yr ${r.co2E >= r.co2K ? 'lower with KK' : 'higher with KK'}</div>
     </div>
@@ -678,7 +679,7 @@ async function renderQuotes() {
 async function renderUnits() {
   const units = await api('/api/units');
   $('#view').innerHTML = `
-  <div class="note-banner">⚙️ This catalog drives the Unit A / B / C picker in the calculator. Set Kold Katcher's real kit pricing and fuel usage here — seeded numbers are placeholders.</div>
+  <div class="note-banner">⚙️ Loaded from Kold Katcher's official 2026 price sheets: real CDN list pricing and manufacturer burn rates (gas consumption @ maximum output). S-series = complete solar; T-series = customer-supplied power. Propane L/hr is derived from the BTU rating — confirm with KK. Install & maintenance are estimates: set your real numbers.</div>
   <div class="card neutral">
     <h2>Kold Katcher Unit Catalog</h2>
     <table class="list">
@@ -785,7 +786,7 @@ function renderSettings() {
     <div class="grid3">
       ${fld('Power Cost ($/kWh)', 's-power', st.power_rate_kwh, {step: 0.01})}
       ${fld('Demand Charge ($/kW/mo)', 's-demand', st.demand_charge_kw_mo, {step: 0.01})}
-      ${fld('Grid CO₂ (kg/kWh)', 's-co2', st.grid_co2_kg_kwh, {step: 0.01, hint: 'Alberta grid ≈ 0.43'})}
+      ${fld('Grid CO₂ (kg/kWh)', 's-co2', st.grid_co2_kg_kwh, {step: 0.01, hint: 'Alberta grid ≈ 0.34 (2024 published)'})}
       <div class="field"><label>Gas Price</label><div class="inline-unit">
         <input type="number" id="s-gas" value="${esc(st.gas_price)}" min="0" step="0.01">
         <select id="s-gas-unit"><option value="GJ" ${st.gas_price_unit === 'GJ' ? 'selected' : ''}>$/GJ</option><option value="Mcf" ${st.gas_price_unit === 'Mcf' ? 'selected' : ''}>$/Mcf</option></select>
@@ -914,8 +915,8 @@ function buildPrintQuote() {
       <div class="pq-stats">
         ${stat('Annual Operating Savings', `<span style="color:${sign(r.savings)}">${money(r.savings)}</span>`, `Electric ${money(r.opexE)}/yr vs KK ${money(r.opexK)}/yr`)}
         ${stat('Payback Period', pbText, pb === 0 ? 'Ahead from day one' : 'Then pure savings')}
-        ${stat(`${r.years}-Year Savings`, `<span style="color:${sign(r.tcoSavings)}">${money(r.tcoSavings)}</span>`, `Total cost of ownership`)}
-        ${stat('Return on Investment', `${num(r.roiPct, 0)}%`, `On the Kold Katcher investment`)}
+        ${stat(`${r.years}-Year Savings`, `<span style="color:${sign(r.tcoSavings)}">${money(r.tcoSavings)}</span>`, `Total cost of ownership, undiscounted`)}
+        ${stat('Return on Investment', `${num(r.roiPct, 0)}%`, `Undiscounted, over ${r.years} years`)}
       </div>
 
       <div class="pq-chart">
@@ -1033,8 +1034,8 @@ function defaultVent() {
   return {
     pumps: 4, vent_scfd: 250, ch4_pct: 90,
     gas_conserved: true, gas_price: F(S.settings.gas_price) || 2.5,
-    carbon_credit: true, carbon_price: F(S.settings.carbon_price_t) || 110, gwp: F(S.settings.ch4_gwp) || 28,
-    old_maint: 500, skid_cost: 18000, skid_install: 1500, skid_maint: 300,
+    carbon_credit: true, carbon_price: F(S.settings.carbon_price_t) || 95, gwp: F(S.settings.ch4_gwp) || 28,
+    old_maint: 500, skid_cost: 8131, skid_install: 1500, skid_maint: 300,
     days: 365, years: 10
   };
 }
@@ -1068,7 +1069,7 @@ function renderVentTool() {
       </div>
       <div class="frow3">
         ${fld('Gas Price ($/GJ)', 'v_gas_price', v.gas_price, {step: 0.01})}
-        ${fld('Carbon Value ($/t CO₂e)', 'v_carbon_price', v.carbon_price, {step: 1, hint: 'AB TIER / federal benchmark'})}
+        ${fld('Carbon Value ($/t CO₂e)', 'v_carbon_price', v.carbon_price, {step: 1, hint: 'AB TIER fund $95/t — offsets trade below; confirm protocol eligibility'})}
         ${fld('CH₄ GWP', 'v_gwp', v.gwp, {step: 1, hint: 'AB TIER uses 25'})}
       </div>
       <div class="frow">
@@ -1082,7 +1083,7 @@ function renderVentTool() {
       <h2><span class="dot red"></span> Kold Katcher Solar Pumping System</h2>
       <p class="hint" style="margin-top:0">Magnetically-coupled, stainless, brushless variable-speed — circulates chemical/glycol with zero vent gas and no compressed-air infrastructure.</p>
       <div class="frow3">
-        ${fld('Skid Cost ($)', 'v_skid_cost', v.skid_cost, {hint: 'PLACEHOLDER — set real pricing'})}
+        ${fld('Skid Cost ($)', 'v_skid_cost', v.skid_cost, {hint: 'SPSX-280-SP CDN list $8,131 · 560-SP $10,845 · 560-DP $12,127 · FPS-1040 pump box $3,453'})}
         ${fld('Install ($)', 'v_skid_install', v.skid_install)}
         ${fld('Maintenance ($/yr)', 'v_skid_maint', v.skid_maint)}
       </div>
@@ -1784,7 +1785,7 @@ function mathContentHTML(c, r) {
   const scfh = r.hours ? r.scfYr / r.hours : 0;
   const lph = r.hours ? r.litresYr / r.hours : 0;
   const hoursStr = num(r.hours, 1); // show the exact 730.5-based value so multiplications verify
-  const gridF = F(S.settings.grid_co2_kg_kwh) || 0.43;
+  const gridF = gridCo2KgKwh();
   const pbLine = r.payback === 0 ? 'Capital is already ≤ electric with lower operating cost → <b>immediate</b>'
     : (r.payback == null ? 'No operating savings at these inputs → <b>no payback</b>'
       : `(${money(r.capexK)} − ${money(r.capexE)}) ÷ ${money(r.savings)}/yr = <b>${num(r.payback, 1)} years</b>`);
@@ -1886,6 +1887,7 @@ function mathContentHTML(c, r) {
       `${money(r.tcoE)} − ${money(r.tcoK)} = <b class="${r.tcoSavings >= 0 ? 'pos' : 'neg'}">${money(r.tcoSavings)}</b>`)}
     ${mf('Return on investment', 'ROI = TCO savings ÷ KK capital × 100',
       `${money(r.tcoSavings)} ÷ ${money(r.capexK)} × 100 = <b class="${r.roiPct >= 0 ? 'pos' : 'neg'}">${num(r.roiPct, 0)}%</b>`)}
+    <div class="mf-note">All comparison figures are <b>undiscounted</b> — future dollars at par, no power/gas/carbon price escalation. That treatment is applied identically to both systems; an NPV view can be added if a customer requires it.</div>
   </div>
 
   <div class="card neutral">
@@ -1953,7 +1955,7 @@ function showAssumeForm() {
       ${fld('Natural gas energy (GJ/scf)', 'as-nggj', st.ng_energy_gj_scf || GJ_PER_SCF, {step: 0.000001, hint: '0.001055 ≈ 1,000 BTU/scf; raise for richer gas'})}
       ${fld('Natural gas CO₂ (kg/scf)', 'as-ngco2', st.ng_co2_kg_scf || KG_CO2_PER_SCF_NG, {step: 0.0001})}
       ${fld('Propane CO₂ (kg/L)', 'as-propco2', st.propane_co2_kg_l || KG_CO2_PER_L_PROPANE, {step: 0.01})}
-      ${fld('Grid CO₂ (kg/kWh)', 'as-grid', st.grid_co2_kg_kwh || 0.43, {step: 0.01, hint: 'Alberta grid intensity'})}
+      ${fld('Grid CO₂ (kg/kWh)', 'as-grid', st.grid_co2_kg_kwh || 0.335, {step: 0.01, hint: 'Alberta grid intensity (0.335 = 2024 published)'})}
     </div>
     <div class="actions">
       <button class="btn primary" id="as-save">Save Assumptions</button>
@@ -1965,7 +1967,7 @@ function showAssumeForm() {
   $('#as-cancel').addEventListener('click', () => $('#assume-form').innerHTML = '');
   $('#as-reset').addEventListener('click', () => {
     $('#as-nggj').value = GJ_PER_SCF; $('#as-ngco2').value = KG_CO2_PER_SCF_NG;
-    $('#as-propco2').value = KG_CO2_PER_L_PROPANE; $('#as-grid').value = 0.43;
+    $('#as-propco2').value = KG_CO2_PER_L_PROPANE; $('#as-grid').value = 0.335;
   });
   $('#as-save').addEventListener('click', async () => {
     const body = {

@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS quotes (
 `);
 
 const DEFAULT_SETTINGS = {
-  power_rate_kwh: '0.12',        // $/kWh delivered energy cost
+  power_rate_kwh: '0.20',        // ALL-IN delivered $/kWh (AB energy ~12¢ + delivery/transmission/riders ~5-8¢)
   demand_charge_kw_mo: '0',      // $/kW/month demand charge (optional)
   gas_price: '2.50',             // natural gas price
   gas_price_unit: 'GJ',          // GJ | Mcf
@@ -94,12 +94,12 @@ const DEFAULT_SETTINGS = {
   propane_price_unit: 'L',       // L | gal
   season_months: '7',            // freeze season length (Oct-Apr default)
   duty_cycle_pct: '60',          // thermostat duty cycle for heat systems
-  grid_co2_kg_kwh: '0.43',       // Alberta grid intensity kg CO2e/kWh
+  grid_co2_kg_kwh: '0.335',      // Alberta grid intensity 2024 published (post coal phase-out)
   analysis_years: '10',
   company_phone: '1-877-644-2268',
   company_email: 'r.dumaine@koldkatcher.com',
   company_city: 'Drumheller, Alberta',
-  carbon_price_t: '110',         // $/tonne CO2e (federal benchmark 2026: $110)
+  carbon_price_t: '95',          // $/t CO2e — AB TIER fund price (frozen at $95 in 2025); federal benchmark is $110
   ch4_gwp: '28',                 // CH4 global warming potential (AR5, current AB/federal reporting)
   ng_energy_gj_scf: '0.001076',  // editable — 1,020 BTU/scf (Alberta GHG methodology default)
   ng_co2_kg_scf: '0.0541',       // editable — EPA 53.06 kg CO2/MMBtu × 1,020 BTU/scf
@@ -122,19 +122,68 @@ const DEFAULT_SETTINGS = {
 const getSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
 const insSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insSetting.run(k, v);
-// one-time migration of stale 2025 carbon defaults (only if untouched)
-db.prepare("UPDATE settings SET value='110' WHERE key='carbon_price_t' AND value='95'").run();
+// migrations of superseded defaults (match-old-value semantics: only fires if the user never changed it)
 db.prepare("UPDATE settings SET value='28' WHERE key='ch4_gwp' AND value='25'").run();
 db.prepare("UPDATE settings SET value='95' WHERE key='def_ek_price' AND value='150'").run();
+db.prepare("UPDATE settings SET value='0.20' WHERE key='power_rate_kwh' AND value='0.12'").run();
+db.prepare("UPDATE settings SET value='0.335' WHERE key='grid_co2_kg_kwh' AND value='0.43'").run();
+db.prepare("UPDATE settings SET value='95' WHERE key='carbon_price_t' AND value='110'").run(); // AB TIER fund price frozen at $95
 
-// Seed the default unit catalog once (placeholder numbers — edit in Unit Catalog)
+// Real 2026 Kold Katcher catalog (specs + CDN list pricing from KK's own sheets, Aug 2026).
+// Burn rates are manufacturer "gas consumption @ maximum output"; propane L/hr derived from BTU rating.
+db.prepare("DELETE FROM units WHERE description LIKE '%PLACEHOLDER SPECS%'").run();
 const unitCount = db.prepare('SELECT COUNT(*) AS n FROM units').get().n;
 if (unitCount === 0) {
   const ins = db.prepare(`INSERT INTO units (code, name, description, kit_cost, install_cost, ng_scfh, propane_lph, maint_per_year, coverage_ft, sort)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  ins.run('A', 'Kold Katcher — Unit A (Small)', 'Compact glycol heat trace system for short runs. PLACEHOLDER SPECS — set real pricing and fuel usage in Unit Catalog.', 12500, 1500, 15, 0.62, 250, '50 – 175 ft', 1);
-  ins.run('B', 'Kold Katcher — Unit B (Medium)', 'Mid-size glycol heat trace system. PLACEHOLDER SPECS — set real pricing and fuel usage in Unit Catalog.', 18500, 2000, 30, 1.24, 250, '175 – 350 ft', 2);
-  ins.run('C', 'Kold Katcher — Unit C (Large)', 'Large glycol heat trace system for long runs / multiple lines. PLACEHOLDER SPECS — set real pricing and fuel usage in Unit Catalog.', 27500, 2500, 60, 2.48, 350, '350 – 650 ft', 3);
+  const desc = (btu, series, usd) => `${btu.toLocaleString('en-CA')} BTU/hr flush-mount catalytic heater (flameless, 700°F face), ½" tubing loop, Class I Div II. ${series} CDN list pricing (USD $${usd}). Install & maintenance are estimates — set your real numbers.`;
+  // S-series — complete solar systems (380 W module + battery bank)
+  ins.run('S5',  'Elite S5KX — 5,000 BTU/hr (Solar)',  desc(5000, 'Complete solar system.', '9,985.85'),  11095.40, 1500, 5,  0.21, 250, '50 – 175 ft', 1);
+  ins.run('S10', 'Elite S10KX — 10,000 BTU/hr (Solar)', desc(10000, 'Complete solar system.', '14,695.24'), 16532.15, 1500, 10, 0.41, 250, '175 – 350 ft', 2);
+  ins.run('S20', 'Elite S20KX — 20,000 BTU/hr (Solar)', desc(20000, 'Complete solar system.', '16,846.64'), 17827.47, 1500, 20, 0.83, 250, '350 – 650 ft', 3);
+  ins.run('S40', 'Elite S40KX — 40,000 BTU/hr (Solar)', desc(40000, 'Complete solar system.', '19,917.78'), 21837.65, 1500, 40, 1.65, 250, '650 – 1,000 ft', 4);
+  // T-series — customer-supplied power (TEG / battery add-ons available)
+  ins.run('T5',  'Elite T5KX — 5,000 BTU/hr (Cust. Power)',  desc(5000, 'Customer-supplied power.', '7,280.65'),  8390.20,  1500, 5,  0.21, 250, '50 – 175 ft', 5);
+  ins.run('T10', 'Elite T10KX — 10,000 BTU/hr (Cust. Power)', desc(10000, 'Customer-supplied power.', '10,859.63'), 11825.32, 1500, 10, 0.41, 250, '175 – 350 ft', 6);
+  ins.run('T20', 'Elite T20KX — 20,000 BTU/hr (Cust. Power)', desc(20000, 'Customer-supplied power.', '12,172.21'), 13868.10, 1500, 20, 0.83, 250, '350 – 650 ft', 7);
+  ins.run('T40', 'Elite T40KX — 40,000 BTU/hr (Cust. Power)', desc(40000, 'Customer-supplied power.', '14,391.06'), 15939.94, 1500, 40, 1.65, 250, '650 – 1,000 ft', 8);
+}
+
+// Seed the knowledge base with the official 2026 price sheet (replaces the old made-up sample doc)
+db.prepare("DELETE FROM kb_docs WHERE name = 'dealer-prices-2026.txt'").run();
+const kbCount = db.prepare('SELECT COUNT(*) AS n FROM kb_docs').get().n;
+if (kbCount === 0) {
+  const PRICE_TEXT = `KOLD KATCHER 2026 OFFICIAL PRICE SHEET (from company price sheets, Aug 2026) — 1-877-644-2268, koldkatcher.com
+
+GLYCOL HEAT TRACE — "T" SERIES (customer-supplied power), CDN / USD:
+Elite T5KX  5,000 BTU/hr,  50-175 ft:  $8,390.20 / $7,280.65
+Elite T10KX 10,000 BTU/hr, 175-350 ft: $11,825.32 / $10,859.63
+Elite T20KX 20,000 BTU/hr, 350-650 ft: $13,868.10 / $12,172.21
+Elite T40KX 40,000 BTU/hr, 650-1000 ft: $15,939.94 / $14,391.06
+T-series add-ons (CDN / USD): 5050N-24 TEG 50 W +$14,156.20 / $12,105.00; 5100N-24 TEG 100 W +$15,156.20 / $13,105.00; 2× 155 AH battery backup +$1,300 / $1,100; 4× 155 AH battery backup +$2,200 / $1,900.
+
+GLYCOL HEAT TRACE — "S" SERIES (complete solar system), CDN / USD:
+Elite S5KX  5,000 BTU/hr,  50-175 ft:  $11,095.40 / $9,985.85
+Elite S10KX 10,000 BTU/hr, 175-350 ft: $16,532.15 / $14,695.24
+Elite S20KX 20,000 BTU/hr, 350-650 ft: $17,827.47 / $16,846.64
+Elite S40KX 40,000 BTU/hr, 650-1000 ft: $21,837.65 / $19,917.78
+
+SOLAR PUMPING SYSTEMS (circulators), CDN / USD:
+SPSX-280-SP 0-0.7 GPM, up to 500 ft: $8,130.98 / $7,317.88
+SPSX-560-SP 0-1.0 GPM, up to 1000 ft: $10,845.00 / $8,976.00
+SPSX-560-DP 0-2.0 GPM, up to 1000 ft: $12,126.80 / $9,789.29
+
+FTR SERIES (AC power only), CDN / USD:
+FTR-80 80,000 BTU/hr, 2,000 ft: $31,117.00 / $27,327.00
+FTR-120 120,000 BTU/hr tank heating, 400 bbl: $37,620.00 / $33,982.00
+
+IN-LINE HEATER BOOSTERS, CDN / USD: B10KX 10,000 BTU $6,944 / $6,264; B20KX 20,000 BTU $8,126 / $7,232; B40KX 40,000 BTU $11,200 / $9,876.
+PNEUMATIC-TO-ELECTRIC CONVERSION: FPS-1040 bolt-on pump box, 0-1000 ft: $3,452.72 / $2,980.00.
+ACCESSORIES: KK-NHBC 24 V 20 A battery charger/tender: $1,118.35 / $987.90.
+
+SPEC NOTES (from KK spec sheets): all KX heat-trace units use flush-mount catalytic heaters (flameless, ~700°F face temp), gas consumption at maximum output = BTU rating ÷ 1,000 in scf/hr (5KX = 5 scf/hr, 10KX = 10, 20KX = 20, 40KX = 40). ½" tubing loops. Class I Div II available. Max glycol set point 65°C (150°F) inlet, 98°C high-temp shutdown. S-series: 380 W solar module, 200-300 AH batteries. T-series: runs on customer power, optional TEG or battery add-ons; T10KX power capacity 50 W @ 24 VDC with auxiliary power hub.`;
+  db.prepare('INSERT INTO kb_docs (name, mime, data, text_content, notes) VALUES (?, ?, ?, ?, ?)')
+    .run('KK 2026 Official Price Sheet (CDN + USD)', 'text/plain', '', PRICE_TEXT, 'Official Kold Katcher 2026 pricing + spec summary — loaded from company price sheets');
 }
 
 // ---------- helpers ----------
