@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS quotes (
 `);
 
 const DEFAULT_SETTINGS = {
-  power_rate_kwh: '0.20',        // ALL-IN delivered $/kWh (AB energy ~12¢ + delivery/transmission/riders ~5-8¢)
+  power_rate_kwh: '0.14',        // ALL-IN delivered $/kWh incl. T&D — typical AB oilfield class; use the customer's bill
   demand_charge_kw_mo: '0',      // $/kW/month demand charge (optional)
   gas_price: '2.50',             // natural gas price
   gas_price_unit: 'GJ',          // GJ | Mcf
@@ -125,7 +125,8 @@ for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insSetting.run(k, v);
 // migrations of superseded defaults (match-old-value semantics: only fires if the user never changed it)
 db.prepare("UPDATE settings SET value='28' WHERE key='ch4_gwp' AND value='25'").run();
 db.prepare("UPDATE settings SET value='95' WHERE key='def_ek_price' AND value='150'").run();
-db.prepare("UPDATE settings SET value='0.20' WHERE key='power_rate_kwh' AND value='0.12'").run();
+db.prepare("UPDATE settings SET value='0.14' WHERE key='power_rate_kwh' AND value='0.12'").run();
+db.prepare("UPDATE settings SET value='0.14' WHERE key='power_rate_kwh' AND value='0.20'").run();
 db.prepare("UPDATE settings SET value='0.335' WHERE key='grid_co2_kg_kwh' AND value='0.43'").run();
 db.prepare("UPDATE settings SET value='95' WHERE key='carbon_price_t' AND value='110'").run(); // AB TIER fund price frozen at $95
 
@@ -189,14 +190,16 @@ SPEC NOTES (from KK spec sheets): all KX heat-trace units use flush-mount cataly
 // Seed a showcase ROI (typical KK win: remote wellsite, no grid power, unit on site fuel gas)
 const qCount = db.prepare('SELECT COUNT(*) AS n FROM quotes').get().n;
 if (qCount === 0) {
-  const s10 = db.prepare("SELECT id FROM units WHERE code = 'S10'").get();
+  const t10 = db.prepare("SELECT id FROM units WHERE code = 'T10'").get();
   const examplePayload = {
-    customer: 'Example — Remote Single-Well Gas Site', site: 'Peace Region, AB (no grid power on lease)', prepared_by: 'Kold Katcher Inc.',
+    customer: 'Example — Single-Well Gas Site', site: 'Powered lease, Peace Region AB — panel 400 ft from wellhead', prepared_by: 'Kold Katcher Inc.',
     len_ft: 300, watts_per_ft: 5, trace_cost_ft: 12, voltage: 240, auto_kits: true, startup_f: -40, breaker_a: 20,
-    pk_qty: 2, pk_price: 350, ek_qty: 2, ek_price: 95, cable_ft: 100, cable_cost_ft: 6,
-    elec_install: 2500, grid_ext: 45000, elec_maint: 0, power_rate: 0.20, demand_charge: 0,
+    // electric side: hazloc reality — teck run from the existing panel + certified electrical work
+    pk_qty: 2, pk_price: 350, ek_qty: 2, ek_price: 95, cable_ft: 400, cable_cost_ft: 12,
+    elec_install: 8500, grid_ext: 0, elec_maint: 0, power_rate: 0.14, demand_charge: 0,
     season_months: 7, duty_cycle_pct: 60, analysis_years: 10,
-    unit_id: s10 ? s10.id : null, kk_kit_cost: 16532.15, kk_install: 1500, kk_maint: 250,
+    // KK side: T10KX (site already has power for the pump), running on site fuel gas
+    unit_id: t10 ? t10.id : null, kk_kit_cost: 11825.32, kk_install: 1500, kk_maint: 250,
     tube_cost_ft: 3.5, tube_install: 1500, fuel_hookup: 800,
     fuel_type: 'ng', ng_usage: 10, ng_usage_unit: 'scf', gas_price: 2.50, gas_price_unit: 'GJ', site_gas: true,
     prop_usage: 0.41, prop_usage_unit: 'L', prop_price: 0.65, prop_price_unit: 'L'

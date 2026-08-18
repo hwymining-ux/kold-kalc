@@ -48,7 +48,7 @@ function defaultCalc() {
     pk_qty: 2, pk_price: F(st.def_pk_price) || 350, ek_qty: 2, ek_price: F(st.def_ek_price) || 150,
     cable_ft: 100, cable_cost_ft: F(st.def_cable_cost_ft) || 6,
     elec_install: 2500, grid_ext: 0, elec_maint: 0,
-    power_rate: F(st.power_rate_kwh) || 0.20,
+    power_rate: F(st.power_rate_kwh) || 0.14,
     demand_charge: F(st.demand_charge_kw_mo) || 0,
     // shared operating assumptions
     season_months: F(st.season_months) || 7,
@@ -231,7 +231,7 @@ function renderCalc() {
         ${fld('Maintenance ($/yr)', 'elec_maint', c.elec_maint)}
       </div>
       <div class="frow">
-        ${fld('All-In Power Cost ($/kWh)', 'power_rate', c.power_rate, {step: 0.01, hint: 'Total bill ÷ kWh — AB energy ~12¢ + delivery/riders ~5-8¢'})}
+        ${fld('All-In Power Cost ($/kWh)', 'power_rate', c.power_rate, {step: 0.01, hint: 'Total bill ÷ kWh incl. T&D — AB oilfield typically ~14¢; use the actual customer bill'})}
         ${fld('Demand Charge ($/kW/mo)', 'demand_charge', c.demand_charge, {step: 0.01, hint: 'Only if on a demand tariff — keep $/kWh volumetric-only then'})}
       </div>
     </div>
@@ -857,122 +857,167 @@ function buildPrintQuote() {
   const pbText = pb === 0 ? 'Immediate' : (pb == null ? 'N/A' : (pb > r.years ? `Beyond ${r.years} yrs` : (pb < 1 ? Math.round(pb * 12) + ' months' : num(pb, 1) + ' years')));
   const fuelName = c.fuel_type === 'ng' ? (c.site_gas ? 'site fuel gas' : 'natural gas') : 'propane';
   const kkWins = r.tcoSavings >= 0;
-  const capexLower = r.capexK <= r.capexE;
+  const capexAdv = r.capexE - r.capexK;
   const chartImg = cumulativeChartDataURL({
     a: { label: 'Electric', color: '#2563eb', capex: r.capexE, opex: r.opexE },
     b: { label: 'Kold Katcher', color: '#da2727', capex: r.capexK, opex: r.opexK },
     years: r.years, advantage: 'KK advantage'
-  }, 780, 350);
+  }, 780, 330);
   const green = '#1a7f37', red = '#b31f1f';
   const sign = v => (v >= 0 ? green : red);
 
-  const stat = (label, value, sub, big) => `
-    <div class="pqs${big ? ' pqs-hero' : ''}">
+  const stat = (label, value, sub) => `
+    <div class="pqs">
       <div class="pqs-label">${label}</div>
-      <div class="pqs-value"${big ? '' : ''}>${value}</div>
+      <div class="pqs-value">${value}</div>
       <div class="pqs-sub">${sub}</div>
     </div>`;
 
   const BENEFITS = [
-    ['⚡', 'No grid power needed', 'Runs on natural gas or produced site gas — no line extension, no utility bill, no demand charges.'],
-    ['🛠️', 'Nothing to trip or ground-fault', "Electric trace's #1 failure is nuisance breaker trips and ground faults from cable damage, moisture and insulation breakdown. A sealed glycol loop has none of it."],
-    ['📏', 'Built for long runs', 'Electric trace is capped by voltage drop and max circuit length — more circuits, more kits, more cost the longer the line. One glycol unit carries heat the full distance.'],
-    ['🔌', 'Keeps working in outages', 'A glycol loop keeps protecting your lines even when the power is down — electric trace goes cold the moment it loses power.'],
-    ['🛡️', 'No hazardous-area wiring', 'No Class I Div. electrical on the piping, and none of the fire-tube burner risk it replaces — high-temp shutdown and pressure relief are built in.'],
-    ['📉', 'Lower operating cost', `${money(r.savings)}/yr less to run than electric — and it compounds every winter.`]
+    ['Lower installed cost', capexAdv >= 0 ? `${money(capexAdv)} less capital than electric heat trace on this scope — the win starts on day one.` : `Competitive installed cost against electric on this scope, with no electrical scope growth risk.`],
+    ['Lower operating cost', `${money(r.savings)}/yr less to run${c.site_gas ? ' — the burner uses site fuel gas, so there is no fuel bill at all' : ''}. Savings compound every winter.`],
+    ['Nothing to trip or ground-fault', "The most common electric heat trace failures are nuisance breaker trips and ground faults from cable damage, moisture and insulation breakdown. A sealed glycol loop has none of them."],
+    ['Keeps working through outages', 'The glycol loop keeps protecting lines when site power blinks — electric trace goes cold the moment it loses supply.'],
+    ['No hazardous-area electrical on the piping', 'No Class I Div. wiring along the line, no GFEP circuits to certify, and none of the fire-tube burner risk it replaces. Flameless catalytic heater with built-in high-temp shutdown.'],
+    ['Sized from manufacturer data', 'Unit selection, burn rate and electric circuit counts all come from published manufacturer tables — every number in this document is auditable in the appendix.']
   ];
+
+  // grouped comparison bars (scaled per pair)
+  const barGroup = (label, vE, vK) => {
+    const mx = Math.max(vE, vK) || 1;
+    return `
+    <div class="pqb-group">
+      <div class="pqb-glabel">${label}</div>
+      <div class="pqb-row"><span class="pqb-name">Electric</span><div class="pqb-track"><div class="pqb-bar e" style="width:${Math.max(2, vE / mx * 100)}%"></div></div><span class="pqb-val">${money(vE)}</span></div>
+      <div class="pqb-row"><span class="pqb-name">Kold Katcher</span><div class="pqb-track"><div class="pqb-bar k" style="width:${Math.max(2, vK / mx * 100)}%"></div></div><span class="pqb-val">${money(vK)}</span></div>
+    </div>`;
+  };
+
+  const runner = `<div class="pq-runner">${esc(S.quoteNumber || 'ROI Analysis')} · Kold Katcher Inc. · ${today}</div>`;
 
   $('#print-root').innerHTML = `
   <div class="pq">
-    <!-- ===== PAGE 1 ===== -->
+    <!-- ===== PAGE 1 — SUMMARY ===== -->
     <section class="pq-page">
       <header class="pq-head">
         <img src="kk-logo.png" alt="Kold Katcher">
         <div class="pq-head-meta">
-          <div class="pq-doc">Freeze Protection ROI Analysis</div>
+          <div class="pq-doc">Freeze Protection · Cost &amp; ROI Analysis</div>
           <div class="pq-num">${esc(S.quoteNumber || 'ROI ANALYSIS')}</div>
           <div class="pq-date">${today}</div>
         </div>
       </header>
 
       <div class="pq-verdict ${kkWins ? '' : 'alt'}">
-        <div class="pv-eyebrow">${kkWins ? 'The bottom line' : 'Cost comparison'}</div>
+        <div class="pv-eyebrow">${kkWins ? 'Summary result' : 'Cost comparison'}</div>
         <div class="pv-headline">${kkWins
-          ? `Kold Katcher saves <em>${money(r.tcoSavings)}</em> over ${r.years} years`
-          : `${r.years}-year total cost of ownership`}</div>
+          ? `Kold Katcher delivers the same freeze protection for <em>${money(r.tcoSavings)}</em> less over ${r.years} years`
+          : `${r.years}-year total cost of ownership, side by side`}</div>
         <div class="pv-sub">${kkWins
-          ? (pb === 0 ? 'Lower cost from day one — the investment never needs to pay back.' : `The switch pays for itself in ${pbText}, then keeps saving.`)
-          : 'Full side-by-side breakdown below.'}</div>
+          ? (pb === 0 ? `${capexAdv > 0 ? money(capexAdv) + ' lower installed cost and ' : ''}${money(r.savings)}/yr lower operating cost — ahead from day one.` : `The premium pays back in ${pbText}, then saves ${money(r.savings)} every year.`)
+          : 'Full itemized breakdown and basis of calculation follow.'}</div>
       </div>
 
       <div class="pq-meta">
         <div><span>Prepared for</span>${esc(c.customer) || '—'}</div>
-        <div><span>Site / LSD</span>${esc(c.site) || '—'}</div>
-        <div><span>System</span>${esc(u.name || 'KK Glycol Heat Trace')} · ${fuelName}</div>
+        <div><span>Site</span>${esc(c.site) || '—'}</div>
+        <div><span>Proposed system</span>${esc(u.name || 'KK Glycol Heat Trace')} · ${fuelName}</div>
         <div><span>Prepared by</span>${esc(c.prepared_by) || 'Kold Katcher Inc.'}</div>
       </div>
 
-      <div class="pq-stats">
-        ${stat('Annual Operating Savings', `<span style="color:${sign(r.savings)}">${money(r.savings)}</span>`, `Electric ${money(r.opexE)}/yr vs KK ${money(r.opexK)}/yr`)}
-        ${stat('Payback Period', pbText, pb === 0 ? 'Ahead from day one' : 'Then pure savings')}
-        ${stat(`${r.years}-Year Savings`, `<span style="color:${sign(r.tcoSavings)}">${money(r.tcoSavings)}</span>`, `Total cost of ownership, undiscounted`)}
-        ${stat('Return on Investment', `${num(r.roiPct, 0)}%`, `Undiscounted, over ${r.years} years`)}
+      <div class="pq-sec"><span>01</span>Executive Summary</div>
+      <ul class="pq-exec">
+        <li><b>${capexAdv >= 0 ? 'Lower installed cost.' : 'Installed cost.'}</b> ${capexAdv >= 0
+          ? `The complete Kold Katcher system installs for ${money(r.capexK)} — ${money(capexAdv)} (${num(capexAdv / (r.capexE || 1) * 100, 0)}%) below the electric heat trace scope of ${money(r.capexE)}.`
+          : `${money(r.capexK)} installed vs ${money(r.capexE)} for electric; the operating savings below carry the case.`}</li>
+        <li><b>Lower operating cost.</b> ${money(r.opexK)}/yr versus ${money(r.opexE)}/yr for electric — ${money(r.savings)} saved every year${c.site_gas ? ', with fuel supplied by the site’s own produced gas' : ''}.</li>
+        <li><b>Result.</b> ${pbText === 'Immediate' ? 'No payback period required — Kold Katcher is ahead from the day it is installed' : `Payback in ${pbText}`}, accumulating to ${money(r.tcoSavings)} over ${r.years} years (${num(r.roiPct, 0)}% undiscounted return on the investment).</li>
+      </ul>
+
+      <div class="pq-kpis">
+        ${stat('Installed Cost Advantage', `<span style="color:${sign(capexAdv)}">${capexAdv >= 0 ? money(capexAdv) : money(capexAdv)}</span>`, `${money(r.capexK)} vs ${money(r.capexE)}`)}
+        ${stat('Operating Savings', `<span style="color:${sign(r.savings)}">${money(r.savings)}</span>`, `per year, every year`)}
+        ${stat('Payback', pbText, pb === 0 ? 'Ahead from day one' : 'Then pure savings')}
+        ${stat(`${r.years}-Year Advantage`, `<span style="color:${sign(r.tcoSavings)}">${money(r.tcoSavings)}</span>`, `${num(r.roiPct, 0)}% ROI, undiscounted`)}
+      </div>
+
+      <div class="pq-sec"><span>02</span>Cost Comparison</div>
+      <div class="pq-bars">
+        ${barGroup('Installed cost', r.capexE, r.capexK)}
+        ${barGroup(`${r.years}-year total cost`, r.tcoE, r.tcoK)}
       </div>
 
       <div class="pq-chart">
         <div class="pq-chart-head">
-          <div class="pq-chart-title">Cumulative Cost of Ownership</div>
+          <div class="pq-chart-title">Cumulative Cost of Ownership — ${r.years} Years</div>
           <div class="pq-chart-legend"><span class="lg lg-e">Electric heat trace</span><span class="lg lg-k">Kold Katcher</span></div>
         </div>
         <img src="${chartImg}" alt="Cumulative cost comparison over ${r.years} years">
-        <div class="pq-chart-cap">Every winter widens the gap. The shaded area is money saved by choosing Kold Katcher.</div>
       </div>
     </section>
 
-    <!-- ===== PAGE 2 ===== -->
+    <!-- ===== PAGE 2 — DETAIL ===== -->
     <section class="pq-page pq-page-2">
-      <h2>Cost Breakdown</h2>
+      ${runner}
+      <div class="pq-sec"><span>03</span>Itemized Cost Breakdown</div>
       <table class="pq-table">
         <thead><tr><th>Line item</th><th>Electric Heat Trace</th><th>Kold Katcher</th></tr></thead>
         <tbody>
-          <tr class="grp"><td colspan="3">Up-front capital</td></tr>
+          <tr class="grp"><td colspan="3">Installed capital</td></tr>
           <tr><td>Heat trace cable — ${num(c.len_ft)} ft @ ${money2(c.trace_cost_ft)}/ft (${num(c.watts_per_ft)} W/ft, ${num(c.voltage, 0)} V)</td><td>${money(r.traceCost)}</td><td>—</td></tr>
-          <tr><td>Power kits (${num(c.pk_qty, 0)}) &amp; end kits (${num(c.ek_qty, 0)}) — ${num(c.pk_qty, 0)} circuit${c.pk_qty === 1 ? '' : 's'}</td><td>${money(r.kitsCost)}</td><td>—</td></tr>
-          <tr><td>Power cable to kits — ${num(c.cable_ft)} ft</td><td>${money(r.cableCost)}</td><td>—</td></tr>
-          <tr><td>Electrical installation${c.grid_ext ? ' + line extension' : ''}</td><td>${money(c.elec_install + c.grid_ext)}</td><td>—</td></tr>
-          <tr><td>${esc(u.name || 'KK unit')} — supplied &amp; installed</td><td>—</td><td>${money(c.kk_kit_cost + c.kk_install)}</td></tr>
-          <tr><td>Tubing — ${num(c.len_ft)} ft @ ${money2(c.tube_cost_ft)}/ft, installed</td><td>—</td><td>${money(r.tubeCost + c.tube_install)}</td></tr>
+          <tr><td>Power kits (${num(c.pk_qty, 0)}) &amp; end kits (${num(c.ek_qty, 0)}) — ${num(c.pk_qty, 0)} circuit${c.pk_qty === 1 ? '' : 's'} <sup>1</sup></td><td>${money(r.kitsCost)}</td><td>—</td></tr>
+          <tr><td>Power cable to trace — ${num(c.cable_ft)} ft @ ${money2(c.cable_cost_ft)}/ft</td><td>${money(r.cableCost)}</td><td>—</td></tr>
+          <tr><td>Electrical installation — panel, GFEP, controls, certified labour${c.grid_ext ? ' + line extension' : ''}</td><td>${money(c.elec_install + c.grid_ext)}</td><td>—</td></tr>
+          <tr><td>${esc(u.name || 'KK unit')} — supplied &amp; installed <sup>2</sup></td><td>—</td><td>${money(c.kk_kit_cost + c.kk_install)}</td></tr>
+          <tr><td>Tubing loop — ${num(c.len_ft)} ft @ ${money2(c.tube_cost_ft)}/ft, installed</td><td>—</td><td>${money(r.tubeCost + c.tube_install)}</td></tr>
           <tr><td>Fuel gas hookup</td><td>—</td><td>${money(c.fuel_hookup)}</td></tr>
-          <tr class="sum"><td>Capital cost</td><td>${money(r.capexE)}</td><td>${money(r.capexK)}${capexLower ? ` <span class="win">▼ ${money(r.capexE - r.capexK)} lower</span>` : ''}</td></tr>
+          <tr class="sum"><td>Installed capital</td><td>${money(r.capexE)}</td><td>${money(r.capexK)}${capexAdv > 0 ? ` <span class="win">${money(capexAdv)} lower</span>` : ''}</td></tr>
           <tr class="grp"><td colspan="3">Annual operating</td></tr>
-          <tr><td>Energy${r.demandCost ? ' + demand charges' : ''} — ${num(r.kwhYr, 0)} kWh @ ${money2(c.power_rate)}/kWh</td><td>${money(r.energyCost + r.demandCost)}</td><td>—</td></tr>
+          <tr><td>Energy${r.demandCost ? ' + demand charges' : ''} — ${num(r.kwhYr, 0)} kWh @ ${money2(c.power_rate)}/kWh all-in <sup>3</sup></td><td>${money(r.energyCost + r.demandCost)}</td><td>—</td></tr>
           <tr><td>Fuel — ${r.fuelDetail}</td><td>—</td><td>${money(r.fuelCost)}</td></tr>
           <tr><td>Maintenance</td><td>${money(c.elec_maint)}</td><td>${money(c.kk_maint)}</td></tr>
-          <tr class="sum"><td>Operating cost / year</td><td>${money(r.opexE)}</td><td>${money(r.opexK)} <span class="win">▼ ${money(r.savings)} lower</span></td></tr>
-          <tr class="grand"><td>${r.years}-Year Total Cost of Ownership</td><td>${money(r.tcoE)}</td><td>${money(r.tcoK)}</td></tr>
+          <tr class="sum"><td>Operating cost per year</td><td>${money(r.opexE)}</td><td>${money(r.opexK)}${r.savings > 0 ? ` <span class="win">${money(r.savings)} lower</span>` : ''}</td></tr>
+          <tr class="grand"><td>${r.years}-year total cost of ownership <sup>4</sup></td><td>${money(r.tcoE)}</td><td>${money(r.tcoK)}</td></tr>
         </tbody>
       </table>
-
-      <h2>Why Kold Katcher</h2>
-      <div class="pq-benefits">
-        ${BENEFITS.map(([ic, t, d]) => `<div class="pqb"><div class="pqb-ic">${ic}</div><div><b>${t}</b><p>${d}</p></div></div>`).join('')}
+      <div class="pq-notes">
+        <div><sup>1</sup> Circuit count from the published Raychem BTV maximum-circuit-length tables (H51086) at ${num(c.startup_f, 0)}°F cold start, ${num(c.breaker_a, 0)} A breakers.</div>
+        <div><sup>2</sup> ${esc(u.code || 'Unit')} pricing per Kold Katcher 2026 CDN list; burn rate is the manufacturer's rated gas consumption at maximum output.</div>
+        <div><sup>3</sup> All-in delivered rate including transmission, distribution and riders, as entered from the customer's bill.</div>
+        <div><sup>4</sup> Undiscounted; no price escalation assumed on either side. Complete formulas in the Appendix.</div>
       </div>
 
-      <h2>Basis of Analysis</h2>
+      <div class="pq-sec"><span>04</span>Why Operators Choose Kold Katcher</div>
+      <div class="pq-benefits">
+        ${BENEFITS.map(([t, d]) => `<div class="pqb"><b>${t}</b><p>${d}</p></div>`).join('')}
+      </div>
+
+      <div class="pq-sec"><span>05</span>Basis of Analysis &amp; Sources</div>
       <table class="pq-table pq-assume">
+        <thead><tr><th>Assumption</th><th>Value used</th><th>Source</th></tr></thead>
         <tbody>
-          <tr><td>Freeze season</td><td>${num(c.season_months)} months/yr · ${num(c.duty_cycle_pct, 0)}% duty cycle</td><td>${num(r.hours, 0)} operating hrs/yr</td></tr>
-          <tr><td>Circuit sizing</td><td>${num(c.pk_qty, 0)} circuit${c.pk_qty === 1 ? '' : 's'} @ ${num(c.breaker_a, 0)} A</td><td>Raychem BTV tables, ${num(c.startup_f, 0)}°F cold start</td></tr>
-          <tr><td>Power &amp; fuel</td><td>${money2(c.power_rate)}/kWh electricity</td><td>${c.site_gas ? 'Site fuel gas (no purchase cost)' : r.fuelDetail}</td></tr>
-          <tr><td>Estimated emissions</td><td>Electric ${num(r.co2E, 1)} t CO₂e/yr</td><td>Kold Katcher ${num(r.co2K, 1)} t CO₂e/yr</td></tr>
+          <tr><td>Operating season</td><td>${num(c.season_months)} months × ${num(c.duty_cycle_pct, 0)}% duty = ${num(r.hours, 0)} hrs/yr</td><td>Applied identically to both systems</td></tr>
+          <tr><td>Unit pricing &amp; burn rate</td><td>${esc(u.code || '—')} · ${money(c.kk_kit_cost)} · ${num(c.ng_usage)} ${c.ng_usage_unit === 'm3' ? 'm³' : 'scf'}/hr max</td><td>Kold Katcher 2026 price &amp; spec sheets</td></tr>
+          <tr><td>Electric circuit sizing</td><td>${num(c.pk_qty, 0)} × ${num(c.voltage, 0)} V circuits</td><td>Raychem BTV datasheet H51086</td></tr>
+          <tr><td>Gas energy content</td><td>${ngGjScf()} GJ/scf (1,020 BTU/scf)</td><td>Alberta GHG Quantification Methodology</td></tr>
+          <tr><td>Emissions</td><td>Electric ${num(r.co2E, 1)} · KK ${num(r.co2K, 1)} t CO₂e/yr</td><td>EPA combustion factors · AB grid ${num(gridCo2KgKwh(), 3)} kg/kWh (2024)</td></tr>
+          <tr><td>Financial convention</td><td>Simple payback, undiscounted totals</td><td>Symmetric treatment; NPV available on request</td></tr>
         </tbody>
       </table>
 
       <footer class="pq-foot">
         <div class="foot-brand">KOLD KATCHER INC.<span> — field-proven freeze protection for remote oil &amp; gas, since 2003</span></div>
         <div class="foot-contact">${esc(st.company_city || 'Drumheller, Alberta')} &nbsp;·&nbsp; ${esc(st.company_phone || '')} &nbsp;·&nbsp; ${esc(st.company_email || '')} &nbsp;·&nbsp; koldkatcher.com</div>
-        <div class="foot-disc">Figures are estimates for comparison purposes; confirm final pricing with a formal Kold Katcher quotation.</div>
+        <div class="foot-disc">Comparison estimate prepared with customer-specific inputs; confirm final pricing with a formal Kold Katcher quotation.</div>
       </footer>
+    </section>
+
+    <!-- ===== APPENDIX — THE RECEIPTS ===== -->
+    <section class="pq-page pq-page-2 pq-appendix">
+      ${runner}
+      <div class="pq-sec"><span>A</span>Appendix — Complete Calculation Detail</div>
+      <div class="md-intro">Every figure in this document is produced by the formulas below, shown with the exact inputs used for ${esc(c.customer) || 'this analysis'}. Circuit counts reference the published Raychem BTV datasheet; unit pricing and burn rates are Kold Katcher's 2026 published figures. Nothing is hidden — challenge any line and it can be recomputed on the spot.</div>
+      <div class="mathdoc">${mathContentHTML(c, r)}</div>
     </section>
   </div>`;
 }
