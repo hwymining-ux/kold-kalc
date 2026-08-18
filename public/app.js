@@ -227,7 +227,7 @@ function renderCalc() {
       </div>
       <div class="frow3">
         ${fld('Electrical Install ($)', 'elec_install', c.elec_install, {hint: 'Panel, GFEP breakers (code-required for heat trace), t-stat/controller, labour'})}
-        ${fld('Grid / Line Extension ($)', 'grid_ext', c.grid_ext, {hint: 'Cost to bring power to site — set 0 if power exists'})}
+        ${fld('Grid / Line Extension ($)', 'grid_ext', c.grid_ext, {hint: 'Use ONLY if freeze protection is why power comes to site (e.g. gas well, no pumpjack). Power coming anyway? Leave $0.'})}
         ${fld('Maintenance ($/yr)', 'elec_maint', c.elec_maint)}
       </div>
       <div class="frow">
